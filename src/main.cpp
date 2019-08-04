@@ -152,8 +152,7 @@ int main() {
                         double vy = sensor_fusion[i][4];
                         double check_next_car_s = sensor_fusion[i][5];
                         float d = sensor_fusion[i][6];
-                        //debug
-                        cout << "d: " << d << endl;
+
                         // calculate lane of vehicle using d
                         int lane_of_next_car = 0;
                         if (d < 8 && d > 4) {
@@ -161,10 +160,8 @@ int main() {
                         } else if (d < 12 && d > 8) {
                             lane_of_next_car = 2;
                         }
-                        //debug
-                        cout << "lane_of_next_car: " << lane_of_next_car << endl;
-                        double check_next_car_speed = sqrt(vx * vx + vy * vy);
 
+                        double check_next_car_speed = sqrt(vx * vx + vy * vy);
                         check_next_car_s += ((double) prev_size * .02 * check_next_car_speed);
 
                         //store vehicle information for possible lane shifting
@@ -192,16 +189,12 @@ int main() {
 
                         //START do lane change
                         //TODO call cost function, to identify best lane change move and switch to state PLCL or PLCR
-//                        if (change_left_exists && (dist_to_next_car_in_lane[my_lane - 1] - car_s) > MIN_DISTANCE) {
-//                            //debug
-//                            cout << "!!!!! CHANGE LEFT NOW !!!!!" << endl;
-//                            my_lane -= 1;
-//                        } else if (change_right_exists &&
-//                                   (dist_to_next_car_in_lane[my_lane + 1] - car_s) > MIN_DISTANCE) {
-//                            //debug
-//                            cout << "!!!!! CHANGE RIGHT NOW !!!!!" << endl;
-//                            my_lane += 1;
-//                        }
+                        if (change_left_exists && (dist_to_next_car_in_lane[my_lane - 1] - car_s) > MIN_DISTANCE) {
+                            my_lane -= 1;
+                        } else if (change_right_exists &&
+                                   (dist_to_next_car_in_lane[my_lane + 1] - car_s) > MIN_DISTANCE) {
+                            my_lane += 1;
+                        }
                         //END do lane change
 
 
@@ -246,9 +239,6 @@ int main() {
                         ptsy.push_back(ref_y_prev);
                         ptsy.push_back(ref_y);
                     }
-
-                    //debug
-                    //cout << "my_lane: " << my_lane << endl;
 
                     //add Frenet waypoints
                     vector<double> next_wp0 = getXY(car_s + 30, (2 + 4 * my_lane), map_waypoints_s,
