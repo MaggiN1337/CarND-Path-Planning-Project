@@ -13,8 +13,9 @@
 using nlohmann::json;
 using std::string;
 using std::vector;
+using namespace std;
 
-const double MAX_VELOCITY = 80;
+const double MAX_VELOCITY = 49.6;
 const double ACCELERATION = .224;
 const double MIN_DISTANCE = 30;
 
@@ -102,6 +103,26 @@ int main() {
 
                     int prev_size = previous_path_x.size();
 
+                    //START cost function for lane shift
+
+                    // state machine for lane shift options
+                    bool change_left_possible = false;
+                    bool change_right_possible = false;
+                    if (lane == 0) {
+                        change_right_possible = true;
+                    } else if (lane == 1) {
+                        change_left_possible = true;
+                        change_right_possible = true;
+                    } else if (lane == 2) {
+                        change_left_possible = true;
+                    }
+
+                    vector<int> cars_on_left_lane;
+                    vector<int> cars_on_right_lane;
+                    double dist_left_lane = (2 + 4 * lane - 2); //0=0m, 1=4m, 2=8m
+                    double dist_right_lane = (2 + 4 * lane + 2);  //0=4m, 1=8m, 2=12m
+                    //END cost function for lane shift
+
                     //START avoid hitting other cars
 
                     if (prev_size > 0) {
@@ -114,7 +135,7 @@ int main() {
                     for (int i = 0; i < sensor_fusion.size(); i++) {
                         //car is in my lane
                         float d = sensor_fusion[i][6];
-                        if (d < (2 + 4 * lane + 2) && d > (2 + 4 * lane - 2)){
+                        if (d < dist_right_lane && d > dist_left_lane) {
                             double vx = sensor_fusion[i][3];
                             double vy = sensor_fusion[i][4];
                             double check_next_car_speed = sqrt(vx * vx + vy * vy);
@@ -126,22 +147,40 @@ int main() {
                             if ((check_next_car_s > car_s) && ((check_next_car_s - car_s) < MIN_DISTANCE)) {
                                 //reduce speed
                                 too_close = true;
-                                if (lane > 0){
-                                    lane = 0;
-                                }
+                                //TODO check for lane shift
+                                //check vehicles on other lanes
+
+                                //check with frenet the other lane_speeds
+                                //finite state machine gives possible changes - cost function
+                            }
+                            //else if car is on left lane but not on other side
+                        } else if (0 <= d < car_d) {
+                            double check_next_car_s = sensor_fusion[i][5];
+                            if (abs(check_next_car_s) < MIN_DISTANCE/2) {
+                                cars_on_left_lane.push_back(i);
+                            }
+                        } else if (12 >= d > car_d) {
+                            double check_next_car_s = sensor_fusion[i][5];
+                            if (abs(check_next_car_s) < MIN_DISTANCE/2) {
+                                cars_on_right_lane.push_back(i);
                             }
                         }
                     }
 
-                    if (too_close){
+                    //first, slow down if car in front
+                    if (too_close) {
                         ref_vel -= ACCELERATION;
-                    }
-                    else if(ref_vel < MAX_VELOCITY){
+                        //TODO change lane to cheaper lane (cost function here)
+                        if (cars_on_left_lane.empty() && change_left_possible) {
+                            lane -= 1;
+                        } else if (cars_on_right_lane.empty() && change_right_possible) {
+                            lane += 1;
+                        }
+                    } else if (ref_vel < MAX_VELOCITY) {
                         ref_vel += ACCELERATION;
                     }
 
                     //END avoid hitting other cars
-
 
                     // START use spline to smooth ride
                     // waypoints to use spline
