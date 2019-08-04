@@ -181,24 +181,29 @@ int main() {
                         }
                     }
 
-                    //first, slow down if car in front
                     if (too_close) {
+                        //first, slow down if car in front
                         ref_vel -= ACCELERATION;
 
                         //START do lane change
 
+                        //do not change lanes if already in state LCL or LCR
                         if (current_state == VEHICLE_STATES[3] || current_state == VEHICLE_STATES[4]) {
-                            //TODO finish lane shift completely
-                            if (car_d == 2 || car_d == 6 || car_d == 10) {
+
+                            //set state to KL if vehicle is back to middle of lane
+                            if (abs(my_lane + 2 - car_d) < 0.2) {
                                 current_state = VEHICLE_STATES[0];
                             }
+
                         } else if (change_left_exists &&
                                    (dist_to_next_car_in_lane[my_lane - 1] - car_s) > MIN_DISTANCE) {
                             //TODO call cost function, to identify best lane change move and switch to state PLCL or PLCR
                             my_lane -= 1;
+                            current_state = VEHICLE_STATES[3];
                         } else if (change_right_exists &&
                                    (dist_to_next_car_in_lane[my_lane + 1] - car_s) > MIN_DISTANCE) {
                             my_lane += 1;
+                            current_state = VEHICLE_STATES[4];
                         }
                         //END do lane change
 
