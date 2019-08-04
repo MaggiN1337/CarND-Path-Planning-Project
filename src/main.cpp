@@ -169,9 +169,9 @@ int main() {
                         //TODO do I also have to use my s in future?
                         double distance_to_me = check_next_car_s - car_s;
 
-                        //store vehicle information for possible lane shifting
+                        //START store vehicle information for possible lane shifting
                         // if current vehicle is closer than previous vehicle on its lane
-                        if (distance_to_me >0 && distance_to_me < dist_to_next_car_in_lane_front[lane_of_next_car]) {
+                        if (distance_to_me > 0 && distance_to_me < dist_to_next_car_in_lane_front[lane_of_next_car]) {
                             //store distance and speed to next vehicle in front
 
                             //get relative speed to my car
@@ -180,11 +180,13 @@ int main() {
                             //get relative distance to my car
                             dist_to_next_car_in_lane_front[lane_of_next_car] = distance_to_me;
 
-                        } else if (distance_to_me <0 && distance_to_me < dist_to_next_car_in_lane_rear[lane_of_next_car]){
+                        } else if (distance_to_me < 0 &&
+                                   distance_to_me < dist_to_next_car_in_lane_rear[lane_of_next_car]) {
                             //store distance to next vehicle from behind
                             //get relative distance to my car
                             dist_to_next_car_in_lane_rear[lane_of_next_car] = distance_to_me;
                         }
+                        //END store vehicle information for possible lane shifting
 
                         //if car is in my lane && distance gets too small
                         if (lane_of_next_car == my_lane && check_next_car_s > car_s &&
@@ -217,18 +219,32 @@ int main() {
                             }
 
                         }
-                        //TODO call cost function, to identify best lane change move and switch to state PLCL or PLCR
+                        /*TODO call cost function, to identify best lane change move and switch to state PLCL or PLCR
+                         *
+                         * 1. higher speed, closer to maximum is better
+                         * 2. empty lane is better or at least 100 meters
+                         * 3. left change is better
+                         *
+                         * */
+
+
 
                         if (change_left_exists &&
-                                   (dist_to_next_car_in_lane_front[my_lane - 1] - car_s) > MIN_DISTANCE) {
-                            //TODO PLCLeft
+                            (dist_to_next_car_in_lane_front[my_lane - 1]) > MIN_DISTANCE &&
+                            (dist_to_next_car_in_lane_rear[my_lane - 1]) < -MIN_DISTANCE) {
+                            //TODO extract PLCLeft
+                            current_state = VEHICLE_STATES[1];
 
+                            // LCL
                             my_lane -= 1;
                             current_state = VEHICLE_STATES[3];
                         } else if (change_right_exists &&
-                                   (dist_to_next_car_in_lane_front[my_lane + 1] - car_s) > MIN_DISTANCE) {
-                            //TODO PCLRight
+                                   (dist_to_next_car_in_lane_front[my_lane + 1]) > MIN_DISTANCE &&
+                                   (dist_to_next_car_in_lane_rear[my_lane + 1]) < -MIN_DISTANCE) {
+                            //TODO extract PCLRight
+                            current_state = VEHICLE_STATES[2];
 
+                            //LCR
                             my_lane += 1;
                             current_state = VEHICLE_STATES[4];
                         }
