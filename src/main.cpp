@@ -131,7 +131,8 @@ int main() {
 
                     //vectors to store lane information for possible lane changing
                     vector<double> lane_speeds = {MAX_VELOCITY, MAX_VELOCITY, MAX_VELOCITY};
-                    vector<double> dist_to_next_car_in_lane = {9999, 9999, 9999};
+                    vector<double> dist_to_next_car_in_lane_front = {9999, 9999, 9999};
+                    vector<double> dist_to_next_car_in_lane_rear = {9999, 9999, 9999};
 
                     //START avoid hitting other cars
 
@@ -153,7 +154,7 @@ int main() {
                         double check_next_car_s = sensor_fusion[i][5];
                         float d = sensor_fusion[i][6];
 
-                        // calculate lane of vehicle using d
+                        // calculate lane of vehicle using d, ignoring exact position on the lines
                         int lane_of_next_car = 0;
                         if (d < 8 && d > 4) {
                             lane_of_next_car = 1;
@@ -162,15 +163,27 @@ int main() {
                         }
 
                         double check_next_car_speed = sqrt(vx * vx + vy * vy);
+
                         check_next_car_s += ((double) prev_size * .02 * check_next_car_speed);
 
-                        //store vehicle information for possible lane shifting
-                        //if vehicle is on left lane
-                        if (lane_of_next_car == my_lane &&
-                            dist_to_next_car_in_lane[lane_of_next_car] > check_next_car_s) {
+                        //TODO do I also have to use my s in future?
+                        double distance_to_me = check_next_car_s - car_s;
 
-                            lane_speeds[lane_of_next_car] = check_next_car_speed;
-                            dist_to_next_car_in_lane[lane_of_next_car] = check_next_car_s;
+                        //store vehicle information for possible lane shifting
+                        // if current vehicle is closer than previous vehicle on its lane
+                        if (distance_to_me >0 && distance_to_me < dist_to_next_car_in_lane_front[lane_of_next_car]) {
+                            //store distance and speed to next vehicle in front
+
+                            //get relative speed to my car
+                            lane_speeds[lane_of_next_car] = check_next_car_speed - car_speed;
+
+                            //get relative distance to my car
+                            dist_to_next_car_in_lane_front[lane_of_next_car] = distance_to_me;
+
+                        } else if (distance_to_me <0 && distance_to_me < dist_to_next_car_in_lane_rear[lane_of_next_car]){
+                            //store distance to next vehicle from behind
+                            //get relative distance to my car
+                            dist_to_next_car_in_lane_rear[lane_of_next_car] = distance_to_me;
                         }
 
                         //if car is in my lane && distance gets too small
@@ -179,6 +192,14 @@ int main() {
                             //reduce speed
                             too_close = true;
                         }
+                    }
+
+                    //debug
+                    for (int i = 0; i < 3; i++) {
+                        cout << car_speed << " is my speed" << endl;
+                        cout << lane_speeds[i] << " mph on lane " << i << endl;
+                        cout << dist_to_next_car_in_lane_front[i] << " m distance to vehicle" << endl;
+                        cout << dist_to_next_car_in_lane_rear[i] << " m distance to vehicle" << endl;
                     }
 
                     if (too_close) {
@@ -195,13 +216,19 @@ int main() {
                                 current_state = VEHICLE_STATES[0];
                             }
 
-                        } else if (change_left_exists &&
-                                   (dist_to_next_car_in_lane[my_lane - 1] - car_s) > MIN_DISTANCE) {
-                            //TODO call cost function, to identify best lane change move and switch to state PLCL or PLCR
+                        }
+                        //TODO call cost function, to identify best lane change move and switch to state PLCL or PLCR
+
+                        if (change_left_exists &&
+                                   (dist_to_next_car_in_lane_front[my_lane - 1] - car_s) > MIN_DISTANCE) {
+                            //TODO PLCLeft
+
                             my_lane -= 1;
                             current_state = VEHICLE_STATES[3];
                         } else if (change_right_exists &&
-                                   (dist_to_next_car_in_lane[my_lane + 1] - car_s) > MIN_DISTANCE) {
+                                   (dist_to_next_car_in_lane_front[my_lane + 1] - car_s) > MIN_DISTANCE) {
+                            //TODO PCLRight
+
                             my_lane += 1;
                             current_state = VEHICLE_STATES[4];
                         }
