@@ -8,7 +8,7 @@
 #include "helpers.h"
 #include "json.hpp"
 #include "spline.h"
-#include "vehicle.h"
+//#include "vehicle.h"
 
 // for convenience
 using nlohmann::json;
@@ -16,9 +16,9 @@ using std::string;
 using std::vector;
 using namespace std;
 
-const double MAX_VELOCITY = 49.6;
-const double ACCELERATION = .224;
-const double MIN_DISTANCE = 30;
+const double MAX_VELOCITY = 49.5;
+const double ACCELERATION = .5; //.224;
+const double MIN_DISTANCE = 30.0;
 /*
  * list of vehicle states
  * KL = keep lane
@@ -66,16 +66,16 @@ int main() {
         map_waypoints_dy.push_back(d_y);
     }
     // start in lane 1;
-    int lane = 1;
+    int my_lane = 1;
 
     // initial vehicle state
     string current_state = VEHICLE_STATES[0];
 
     // set ideal velocity in mph
-    double ref_vel = 0.0;
+    double ref_vel = 1.0;
 
     h.onMessage([&map_waypoints_x, &map_waypoints_y, &map_waypoints_s,
-                        &map_waypoints_dx, &map_waypoints_dy, &ref_vel, &lane]
+                        &map_waypoints_dx, &map_waypoints_dy, &ref_vel, &my_lane]
                         (uWS::WebSocket<uWS::SERVER> ws, char *data, size_t length,
                          uWS::OpCode opCode) {
 
@@ -117,24 +117,27 @@ int main() {
                     int prev_size = previous_path_x.size();
 
                     //START state machine for lane shift options
-                    bool change_left_possible = false;
-                    bool change_right_possible = false;
-                    if (lane == 0) {
-                        change_right_possible = true;
-                    } else if (lane == 1) {
-                        change_left_possible = true;
-                        change_right_possible = true;
-                    } else if (lane == 2) {
-                        change_left_possible = true;
+                    bool change_left_exists = false;
+                    bool change_right_exists = false;
+                    if (my_lane == 0) {
+                        change_right_exists = true;
+                    } else if (my_lane == 1) {
+                        change_left_exists = true;
+                        change_right_exists = true;
+                    } else if (my_lane == 2) {
+                        change_left_exists = true;
                     }
                     //END state machine for lane shift options
 
-                    vector<double> lane_speeds;
-                    vector<double> lane_distance_to_next_obstacle;
-                    double dist_left_lane = (2 + 4 * lane - 2); //0=0m, 1=4m, 2=8m
-                    double dist_right_lane = (2 + 4 * lane + 2);  //0=4m, 1=8m, 2=12m
+                    //vectors to store lane information for possible lane changing
+                    vector<double> lane_speeds = {MAX_VELOCITY, MAX_VELOCITY, MAX_VELOCITY};
+                    vector<double> dist_to_next_car_in_lane = {9999, 9999, 9999};
 
                     //START avoid hitting other cars
+
+                    //calculate range of lanes
+                    double range_of_left_lane = (2 + 4 * my_lane - 2); //0=0m, 1=4m, 2=8m
+                    double range_of_right_lane = (2 + 4 * my_lane + 2);  //0=4m, 1=8m, 2=12m
 
                     if (prev_size > 0) {
                         car_s = end_path_s;
@@ -142,39 +145,66 @@ int main() {
 
                     bool too_close = false;
 
-                    //find rev_v to use
+                    //iterate over detected vehicles
                     for (int i = 0; i < sensor_fusion.size(); i++) {
-                        //car is in my lane
+                        //get vehicle's values
+                        double vx = sensor_fusion[i][3];
+                        double vy = sensor_fusion[i][4];
+                        double check_next_car_s = sensor_fusion[i][5];
                         float d = sensor_fusion[i][6];
-                        if (d < dist_right_lane && d > dist_left_lane) {
-                            double vx = sensor_fusion[i][3];
-                            double vy = sensor_fusion[i][4];
-                            double check_next_car_speed = sqrt(vx * vx + vy * vy);
-                            double check_next_car_s = sensor_fusion[i][5];
+                        //debug
+                        cout << "d: " << d << endl;
+                        // calculate lane of vehicle using d
+                        int lane_of_next_car = 0;
+                        if (d < 8 && d > 4) {
+                            lane_of_next_car = 1;
+                        } else if (d < 12 && d > 8) {
+                            lane_of_next_car = 2;
+                        }
+                        //debug
+                        cout << "lane_of_next_car: " << lane_of_next_car << endl;
+                        double check_next_car_speed = sqrt(vx * vx + vy * vy);
 
-                            check_next_car_s += ((double) prev_size * .02 * check_next_car_speed);
+                        check_next_car_s += ((double) prev_size * .02 * check_next_car_speed);
 
-                            // if car another car is in my lane && distance gets too small
-                            if ((check_next_car_s > car_s) && ((check_next_car_s - car_s) < MIN_DISTANCE)) {
-                                //reduce speed
-                                too_close = true;
+                        //store vehicle information for possible lane shifting
+                        //if vehicle is on left lane
+                        if (lane_of_next_car == my_lane &&
+                            dist_to_next_car_in_lane[lane_of_next_car] > check_next_car_s) {
 
-                                //check with frenet the other lane_speeds
-                                //finite state machine gives possible changes - cost function
-                                //TODO finish lane shift completely
-                            }
+                            lane_speeds[lane_of_next_car] = check_next_car_speed;
+                            dist_to_next_car_in_lane[lane_of_next_car] = check_next_car_s;
+                        }
+
+                        //if car is in my lane && distance gets too small
+                        if (lane_of_next_car == my_lane && check_next_car_s > car_s &&
+                            ((check_next_car_s - car_s) < MIN_DISTANCE)) {
+                            //reduce speed
+                            too_close = true;
+                            //TODO finish lane shift completely
+                        }
                     }
 
                     //first, slow down if car in front
                     if (too_close) {
                         ref_vel -= ACCELERATION;
-                        //TODO change lane to cheaper lane (cost function here)
-                        //TODO call cost function, to identify best lane change move
-                        if (cars_on_left_lane.empty() && change_left_possible) {
-                            lane -= 1;
-                        } else if (cars_on_right_lane.empty() && change_right_possible) {
-                            lane += 1;
-                        }
+
+
+                        //START do lane change
+                        //TODO call cost function, to identify best lane change move and switch to state PLCL or PLCR
+//                        if (change_left_exists && (dist_to_next_car_in_lane[my_lane - 1] - car_s) > MIN_DISTANCE) {
+//                            //debug
+//                            cout << "!!!!! CHANGE LEFT NOW !!!!!" << endl;
+//                            my_lane -= 1;
+//                        } else if (change_right_exists &&
+//                                   (dist_to_next_car_in_lane[my_lane + 1] - car_s) > MIN_DISTANCE) {
+//                            //debug
+//                            cout << "!!!!! CHANGE RIGHT NOW !!!!!" << endl;
+//                            my_lane += 1;
+//                        }
+                        //END do lane change
+
+
                     } else if (ref_vel < MAX_VELOCITY) {
                         ref_vel += ACCELERATION;
                     }
@@ -217,12 +247,18 @@ int main() {
                         ptsy.push_back(ref_y);
                     }
 
+                    //debug
+                    //cout << "my_lane: " << my_lane << endl;
+
                     //add Frenet waypoints
-                    vector<double> next_wp0 = getXY(car_s + 30, (2 + 4 * lane), map_waypoints_s, map_waypoints_x,
+                    vector<double> next_wp0 = getXY(car_s + 30, (2 + 4 * my_lane), map_waypoints_s,
+                                                    map_waypoints_x,
                                                     map_waypoints_y);
-                    vector<double> next_wp1 = getXY(car_s + 60, (2 + 4 * lane), map_waypoints_s, map_waypoints_x,
+                    vector<double> next_wp1 = getXY(car_s + 60, (2 + 4 * my_lane), map_waypoints_s,
+                                                    map_waypoints_x,
                                                     map_waypoints_y);
-                    vector<double> next_wp2 = getXY(car_s + 90, (2 + 4 * lane), map_waypoints_s, map_waypoints_x,
+                    vector<double> next_wp2 = getXY(car_s + 90, (2 + 4 * my_lane), map_waypoints_s,
+                                                    map_waypoints_x,
                                                     map_waypoints_y);
 
                     ptsx.push_back(next_wp0[0]);

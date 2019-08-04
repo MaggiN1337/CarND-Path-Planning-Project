@@ -17,11 +17,11 @@ using std::vector;
 // Initializes Vehicle
 Vehicle::Vehicle(){}
 
-Vehicle::Vehicle(int lane, float s, float v, float a, string state) {
+Vehicle::Vehicle(int lane, float s, float speed, float accel, string state) {
     this->lane = lane;
     this->s = s;
-    this->v = v;
-    this->a = a;
+    this->v = speed;
+    this->a = accel;
     this->state = state;
     max_acceleration = -1;
 }
