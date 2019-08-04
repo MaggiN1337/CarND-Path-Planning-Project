@@ -75,7 +75,7 @@ int main() {
     double ref_vel = 1.0;
 
     h.onMessage([&map_waypoints_x, &map_waypoints_y, &map_waypoints_s,
-                        &map_waypoints_dx, &map_waypoints_dy, &ref_vel, &my_lane]
+                        &map_waypoints_dx, &map_waypoints_dy, &ref_vel, &my_lane, &current_state]
                         (uWS::WebSocket<uWS::SERVER> ws, char *data, size_t length,
                          uWS::OpCode opCode) {
 
@@ -178,7 +178,6 @@ int main() {
                             ((check_next_car_s - car_s) < MIN_DISTANCE)) {
                             //reduce speed
                             too_close = true;
-                            //TODO finish lane shift completely
                         }
                     }
 
@@ -186,17 +185,22 @@ int main() {
                     if (too_close) {
                         ref_vel -= ACCELERATION;
 
-
                         //START do lane change
-                        //TODO call cost function, to identify best lane change move and switch to state PLCL or PLCR
-                        if (change_left_exists && (dist_to_next_car_in_lane[my_lane - 1] - car_s) > MIN_DISTANCE) {
+
+                        if (current_state == VEHICLE_STATES[3] || current_state == VEHICLE_STATES[4]) {
+                            //TODO finish lane shift completely
+                            if (car_d == 2 || car_d == 6 || car_d == 10) {
+                                current_state = VEHICLE_STATES[0];
+                            }
+                        } else if (change_left_exists &&
+                                   (dist_to_next_car_in_lane[my_lane - 1] - car_s) > MIN_DISTANCE) {
+                            //TODO call cost function, to identify best lane change move and switch to state PLCL or PLCR
                             my_lane -= 1;
                         } else if (change_right_exists &&
                                    (dist_to_next_car_in_lane[my_lane + 1] - car_s) > MIN_DISTANCE) {
                             my_lane += 1;
                         }
                         //END do lane change
-
 
                     } else if (ref_vel < MAX_VELOCITY) {
                         ref_vel += ACCELERATION;
