@@ -14,6 +14,10 @@ using nlohmann::json;
 using std::string;
 using std::vector;
 
+const double MAX_VELOCITY = 80;
+const double ACCELERATION = .224;
+const double MIN_DISTANCE = 30;
+
 int main() {
     uWS::Hub h;
 
@@ -119,18 +123,21 @@ int main() {
                             check_next_car_s += ((double) prev_size * .02 * check_next_car_speed);
 
                             // if car another car is in my lane && distance is too small
-                            if ((check_next_car_s > car_s) && ((check_next_car_s - car_s) < 30)) {
+                            if ((check_next_car_s > car_s) && ((check_next_car_s - car_s) < MIN_DISTANCE)) {
                                 //reduce speed
                                 too_close = true;
+                                if (lane > 0){
+                                    lane = 0;
+                                }
                             }
                         }
                     }
 
                     if (too_close){
-                        ref_vel -= .224;
+                        ref_vel -= ACCELERATION;
                     }
-                    else if(ref_vel < 49.5){
-                        ref_vel += .224;
+                    else if(ref_vel < MAX_VELOCITY){
+                        ref_vel += ACCELERATION;
                     }
 
                     //END avoid hitting other cars
