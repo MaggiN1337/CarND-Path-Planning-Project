@@ -8,6 +8,7 @@
 #include "helpers.h"
 #include "json.hpp"
 #include "spline.h"
+#include "vehicle.h"
 
 // for convenience
 using nlohmann::json;
@@ -18,6 +19,15 @@ using namespace std;
 const double MAX_VELOCITY = 49.6;
 const double ACCELERATION = .224;
 const double MIN_DISTANCE = 30;
+/*
+ * list of vehicle states
+ * KL = keep lane
+ * PLCL = prepare lane change left
+ * PLCR = prepare lane change right
+ * LCL = lane change left
+ * LCR = lane change right
+ */
+const vector<string> VEHICLE_STATES = {"KL", "PLCL", "PLCR", "LCL", "LCR"};
 
 int main() {
     uWS::Hub h;
@@ -57,6 +67,9 @@ int main() {
     }
     // start in lane 1;
     int lane = 1;
+
+    // initial vehicle state
+    string current_state = VEHICLE_STATES[0];
 
     // set ideal velocity in mph
     double ref_vel = 0.0;
@@ -103,9 +116,7 @@ int main() {
 
                     int prev_size = previous_path_x.size();
 
-                    //START cost function for lane shift
-
-                    // state machine for lane shift options
+                    //START state machine for lane shift options
                     bool change_left_possible = false;
                     bool change_right_possible = false;
                     if (lane == 0) {
@@ -116,12 +127,12 @@ int main() {
                     } else if (lane == 2) {
                         change_left_possible = true;
                     }
+                    //END state machine for lane shift options
 
-                    vector<int> cars_on_left_lane;
-                    vector<int> cars_on_right_lane;
+                    vector<double> lane_speeds;
+                    vector<double> lane_distance_to_next_obstacle;
                     double dist_left_lane = (2 + 4 * lane - 2); //0=0m, 1=4m, 2=8m
                     double dist_right_lane = (2 + 4 * lane + 2);  //0=4m, 1=8m, 2=12m
-                    //END cost function for lane shift
 
                     //START avoid hitting other cars
 
@@ -143,34 +154,22 @@ int main() {
 
                             check_next_car_s += ((double) prev_size * .02 * check_next_car_speed);
 
-                            // if car another car is in my lane && distance is too small
+                            // if car another car is in my lane && distance gets too small
                             if ((check_next_car_s > car_s) && ((check_next_car_s - car_s) < MIN_DISTANCE)) {
                                 //reduce speed
                                 too_close = true;
-                                //TODO check for lane shift
-                                //check vehicles on other lanes
 
                                 //check with frenet the other lane_speeds
                                 //finite state machine gives possible changes - cost function
+                                //TODO finish lane shift completely
                             }
-                            //else if car is on left lane but not on other side
-                        } else if (0 <= d < car_d) {
-                            double check_next_car_s = sensor_fusion[i][5];
-                            if (abs(check_next_car_s) < MIN_DISTANCE/2) {
-                                cars_on_left_lane.push_back(i);
-                            }
-                        } else if (12 >= d > car_d) {
-                            double check_next_car_s = sensor_fusion[i][5];
-                            if (abs(check_next_car_s) < MIN_DISTANCE/2) {
-                                cars_on_right_lane.push_back(i);
-                            }
-                        }
                     }
 
                     //first, slow down if car in front
                     if (too_close) {
                         ref_vel -= ACCELERATION;
                         //TODO change lane to cheaper lane (cost function here)
+                        //TODO call cost function, to identify best lane change move
                         if (cars_on_left_lane.empty() && change_left_possible) {
                             lane -= 1;
                         } else if (cars_on_right_lane.empty() && change_right_possible) {
