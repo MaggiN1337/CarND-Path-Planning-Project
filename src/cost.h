@@ -2,10 +2,6 @@
 // Created by NEUEM2 on 04.08.2019.
 //
 
-#ifndef PATH_PLANNING_COST_H
-#define PATH_PLANNING_COST_H
-
-
 #ifndef COST_H
 #define COST_H
 
@@ -24,10 +20,10 @@ float goal_distance_cost(const Vehicle &vehicle,
                          const map<int, vector<Vehicle>> &predictions,
                          map<string, float> &data);
 
-float inefficiency_cost(const Vehicle &vehicle,
-                        const vector<Vehicle> &trajectory,
-                        const map<int, vector<Vehicle>> &predictions,
-                        map<string, float> &data);
+float inefficiency_cost(float target_speed,
+                         int intended_lane,
+                         int final_lane,
+                         vector<float> lane_speeds);
 
 float lane_speed(const map<int, vector<Vehicle>> &predictions, int lane);
 

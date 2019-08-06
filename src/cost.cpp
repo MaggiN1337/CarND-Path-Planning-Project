@@ -49,27 +49,15 @@ float goal_distance_cost(const Vehicle &vehicle,
     return cost;
 }
 
-float inefficiency_cost(const Vehicle &vehicle,
-                        const vector<Vehicle> &trajectory,
-                        const map<int, vector<Vehicle>> &predictions,
-                        map<string, float> &data) {
+float inefficiency_cost(float target_speed,
+                        int intended_lane,
+                        int final_lane,
+                        vector<float> lane_speeds) {
     // Cost becomes higher for trajectories with intended lane and final lane
     //   that have traffic slower than vehicle's target speed.
-    // You can use the lane_speed function to determine the speed for a lane.
-    // This function is very similar to what you have already implemented in
-    //   the "Implement a Second Cost Function in C++" quiz.
-    float proposed_speed_intended = lane_speed(predictions, data["intended_lane"]);
-    if (proposed_speed_intended < 0) {
-        proposed_speed_intended = vehicle.target_speed;
-    }
 
-    float proposed_speed_final = lane_speed(predictions, data["final_lane"]);
-    if (proposed_speed_final < 0) {
-        proposed_speed_final = vehicle.target_speed;
-    }
-
-    float cost = (2.0*vehicle.target_speed - proposed_speed_intended
-                  - proposed_speed_final)/vehicle.target_speed;
+    float cost = (2*target_speed - lane_speeds[intended_lane]
+                  - lane_speeds[final_lane])/target_speed;
 
     return cost;
 }
@@ -98,17 +86,17 @@ float calculate_cost(const Vehicle &vehicle,
     float cost = 0.0;
 
     // Add additional cost functions here.
-    vector<std::function<float(const Vehicle &, const vector<Vehicle> &,
-                               const map<int, vector<Vehicle>> &,
-                               map<string, float> &)
-    >> cf_list = {goal_distance_cost, inefficiency_cost};
-    vector<float> weight_list = {REACH_GOAL, EFFICIENCY};
-
-    for (int i = 0; i < cf_list.size(); ++i) {
-        float new_cost = weight_list[i]*cf_list[i](vehicle, trajectory, predictions,
-                                                   trajectory_data);
-        cost += new_cost;
-    }
+//    vector<std::function<float(const Vehicle &, const vector<Vehicle> &,
+//                               const map<int, vector<Vehicle>> &,
+//                               map<string, float> &)
+//    >> cf_list = {goal_distance_cost, inefficiency_cost};
+//    vector<float> weight_list = {REACH_GOAL, EFFICIENCY};
+//
+//    for (int i = 0; i < cf_list.size(); ++i) {
+//        float new_cost = weight_list[i]*cf_list[i](vehicle, trajectory, predictions,
+//                                                   trajectory_data);
+//        cost += new_cost;
+//    }
 
     return cost;
 }
