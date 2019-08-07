@@ -3,13 +3,10 @@
 #include <iostream>
 #include <string>
 #include <vector>
-#include "Eigen-3.3/Eigen/Core"
-#include "Eigen-3.3/Eigen/QR"
 #include "helpers.h"
 #include "json.hpp"
 #include "spline.h"
 #include "cost.h"
-//#include "vehicle.h"
 
 // for convenience
 using nlohmann::json;
@@ -19,7 +16,6 @@ using namespace std;
 
 const float MAX_VELOCITY = 49.5;
 const double ACCELERATION = .5; //.224;
-const double MIN_DISTANCE = 30.0;
 const double DISTANCE_TO_OVERTAKE = 60.0;
 /*
  * list of vehicle states
@@ -85,11 +81,11 @@ int main() {
         // "42" at the start of the message means there's a websocket message event.
         // The 4 signifies a websocket message
         // The 2 signifies a websocket event
-        if (length && length > 2 && data[0] == '4' && data[1] == '2') {
+        if (length > 2 && data[0] == '4' && data[1] == '2') {
 
             auto s = hasData(data);
 
-            if (s != "") {
+            if (!s.empty()) {
                 auto j = json::parse(s);
 
                 string event = j[0].get<string>();
@@ -110,7 +106,7 @@ int main() {
                     auto previous_path_y = j[1]["previous_path_y"];
                     // Previous path's end s and d values
                     double end_path_s = j[1]["end_path_s"];
-                    double end_path_d = j[1]["end_path_d"];
+//                    double end_path_d = j[1]["end_path_d"];
 
                     // Sensor Fusion Data, a list of all other cars on the same side
                     //   of the road.
@@ -136,12 +132,12 @@ int main() {
                     bool way_too_close = false;
 
                     //iterate over detected vehicles
-                    for (int i = 0; i < sensor_fusion.size(); i++) {
+                    for (auto & i : sensor_fusion) {
                         //get vehicle's values
-                        double vx = sensor_fusion[i][3];
-                        double vy = sensor_fusion[i][4];
-                        double check_next_car_s = sensor_fusion[i][5];
-                        float d = sensor_fusion[i][6];
+                        double vx = i[3];
+                        double vy = i[4];
+                        double check_next_car_s = i[5];
+                        float d = i[6];
 
                         // calculate lane of vehicle using d, ignoring exact position on the lines
                         int lane_of_next_car = 0;
