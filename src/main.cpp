@@ -13,10 +13,6 @@ using nlohmann::json;
 using std::string;
 using std::vector;
 using namespace std;
-
-const float MAX_VELOCITY = 49.5;
-const double ACCELERATION = .5; //.224;
-const double DISTANCE_TO_OVERTAKE = 60.0;
 /*
  * list of vehicle states
  * KL = keep lane
@@ -26,6 +22,12 @@ const double DISTANCE_TO_OVERTAKE = 60.0;
  * LCR = lane change right
  */
 const vector<string> VEHICLE_STATES = {"KL", "PLCL", "PLCR", "LCL", "LCR"};
+// speed limit in mph
+const float MAX_VELOCITY = 49.5;
+// maximum acceleration per frame
+const double ACCELERATION = .5; //.224;
+// distance that should be safe when trying to overtake
+const double DISTANCE_TO_OVERTAKE = 60.0;
 
 int main() {
     uWS::Hub h;
@@ -257,7 +259,7 @@ int main() {
                          *
                          * TODO 0. consider all lanes even if double change is required
                          * 1. higher speed, closer to maximum is better
-                         * 2. empty lane is better or at least DISTANCE_TO_OVERTAKE (100) meters
+                         * 2. empty lane is better or at least DISTANCE_TO_OVERTAKE meters
                          * 3. left change is better (by always using first in if-conditions)
                          *
                          * */
