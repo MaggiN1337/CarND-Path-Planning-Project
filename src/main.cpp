@@ -20,6 +20,7 @@ using namespace std;
 const float MAX_VELOCITY = 49.5;
 const double ACCELERATION = .5; //.224;
 const double MIN_DISTANCE = 30.0;
+const double DISTANCE_TO_OVERTAKE = 100.0;
 /*
  * list of vehicle states
  * KL = keep lane
@@ -133,6 +134,7 @@ int main() {
                     }
 
                     bool too_close = false;
+                    bool way_too_close = false;
 
                     //iterate over detected vehicles
                     for (int i = 0; i < sensor_fusion.size(); i++) {
@@ -154,8 +156,11 @@ int main() {
 
                         check_next_car_s += ((double) prev_size * .02 * check_next_car_speed);
 
-                        //TODO do I also have to use my s in future?
                         double distance_to_me = check_next_car_s - car_s;
+
+                        //debug
+                        cout << "Car " << i << " on lane " << lane_of_next_car << " is in this distance: "
+                             << distance_to_me << endl;
 
                         //START store vehicle information for possible lane shifting
                         // if current vehicle is closer than previous vehicle on its lane
@@ -163,15 +168,17 @@ int main() {
                             //store distance and speed to next vehicle in front
 
                             //get lane speed of next car in front an convert to mph
-                            lane_speeds[lane_of_next_car] = check_next_car_speed * 2.24;
-
+                            if (distance_to_me > DISTANCE_TO_OVERTAKE){
+                                lane_speeds[lane_of_next_car] = MAX_VELOCITY;
+                            } else {
+                                lane_speeds[lane_of_next_car] = check_next_car_speed * 2.24;
+                            }
                             //get relative distance to my car
                             dist_to_next_car_in_lane_front[lane_of_next_car] = distance_to_me;
 
                         } else if (distance_to_me < 0 &&
-                                   distance_to_me < dist_to_next_car_in_lane_rear[lane_of_next_car]) {
+                                   abs(distance_to_me) < abs(dist_to_next_car_in_lane_rear[lane_of_next_car])) {
                             //store distance to next vehicle from behind
-                            //TODO distance to rear vehicle doesnt work?
                             //get relative distance to my car
                             dist_to_next_car_in_lane_rear[lane_of_next_car] = distance_to_me;
                         }
@@ -179,7 +186,11 @@ int main() {
 
                         //if car is in my lane && distance gets too small
                         if (lane_of_next_car == my_lane && check_next_car_s > car_s &&
-                            ((check_next_car_s - car_s) < MIN_DISTANCE)) {
+                            (check_next_car_s - car_s) < MIN_DISTANCE) {
+                            if ((check_next_car_s - car_s) < MIN_DISTANCE / 2) {
+                                //brake very hard
+                                way_too_close = true;
+                            }
                             //reduce speed
                             too_close = true;
                         }
@@ -188,6 +199,8 @@ int main() {
                     //START state machine for lane shift options
                     bool change_left_exists = false;
                     bool change_right_exists = false;
+
+                    //check if lane change is possible by law
                     if (my_lane == 0) {
                         change_right_exists = true;
                     } else if (my_lane == 1) {
@@ -196,21 +209,26 @@ int main() {
                     } else if (my_lane == 2) {
                         change_left_exists = true;
                     }
+                    //calculate distance to next vehicle
+                    double expected_distance = car_speed / 2;
+
+                    //check if lanes have enough room for me
                     change_left_exists = change_left_exists &&
-                                         (dist_to_next_car_in_lane_front[my_lane - 1]) > MIN_DISTANCE &&
-                                         (dist_to_next_car_in_lane_rear[my_lane - 1]) < -MIN_DISTANCE;
+                                         (dist_to_next_car_in_lane_front[my_lane - 1]) > expected_distance &&
+                                         (dist_to_next_car_in_lane_rear[my_lane - 1]) < -expected_distance;
 
                     change_right_exists = change_right_exists &&
-                                          (dist_to_next_car_in_lane_front[my_lane + 1]) > MIN_DISTANCE &&
-                                          (dist_to_next_car_in_lane_rear[my_lane + 1]) < -MIN_DISTANCE;
+                                          (dist_to_next_car_in_lane_front[my_lane + 1]) > expected_distance &&
+                                          (dist_to_next_car_in_lane_rear[my_lane + 1]) < -expected_distance;
                     //END state machine for lane shift options
 
                     //debug
                     for (int i = 0; i < 3; i++) {
                         cout << car_speed << " is my speed" << endl;
                         cout << lane_speeds[i] << " mph on lane " << i << endl;
-                        cout << dist_to_next_car_in_lane_front[i] << " m distance to vehicle front" << endl;
-                        cout << dist_to_next_car_in_lane_rear[i] << " m distance to vehicle back " << endl;
+                        cout << dist_to_next_car_in_lane_front[i] << " m distance to vehicle front on lane " << i
+                             << endl;
+                        cout << dist_to_next_car_in_lane_rear[i] << " m distance to vehicle back on lane " << i << endl;
                     }
                     cout << "my state: " << current_state << endl;
                     cout << dist_to_next_car_in_lane_front[my_lane] << " m distance to vehicle in front" << endl;
@@ -223,6 +241,11 @@ int main() {
                         //slow down if car in front is still faster
                         if (ref_vel > lane_speeds[my_lane] * 0.9) {
                             ref_vel -= ACCELERATION;
+                        }
+
+                        //brake hard to avoid collision
+                        if (way_too_close) {
+                            ref_vel -= ACCELERATION * 5;
                         }
 
                         //START do lane change
@@ -287,13 +310,23 @@ int main() {
 
                         //3. prepare for lane change if lane is free
                         if (current_state == VEHICLE_STATES[1] && change_left_exists) {
-                            //TODO LCL if car from behind is not way faster
+                            //change lane and state
                             my_lane -= 1;
                             current_state = VEHICLE_STATES[3];
+
+                            //speed up too slow
+                            if (car_speed < MAX_VELOCITY*0.9){
+                                ref_vel += ACCELERATION;
+                            }
                         } else if (current_state == VEHICLE_STATES[2] && change_right_exists) {
-                            //TODO CR if car from behind is not way faster
+                            //change lane and state
                             my_lane += 1;
                             current_state = VEHICLE_STATES[4];
+
+                            //speed up too slow
+                            if (car_speed < MAX_VELOCITY*0.9){
+                                ref_vel += ACCELERATION;
+                            }
                         }
                         //END do lane change
 
