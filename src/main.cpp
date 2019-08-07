@@ -20,7 +20,7 @@ using namespace std;
 const float MAX_VELOCITY = 49.5;
 const double ACCELERATION = .5; //.224;
 const double MIN_DISTANCE = 30.0;
-const double DISTANCE_TO_OVERTAKE = 100.0;
+const double DISTANCE_TO_OVERTAKE = 60.0;
 /*
  * list of vehicle states
  * KL = keep lane
@@ -120,14 +120,13 @@ int main() {
 
                     //vectors to store lane information for possible lane changing
                     vector<float> lane_speeds = {MAX_VELOCITY, MAX_VELOCITY, MAX_VELOCITY};
-                    vector<double> dist_to_next_car_in_lane_front = {9999, 9999, 9999};
-                    vector<double> dist_to_next_car_in_lane_rear = {9999, 9999, 9999};
+                    vector<double> dist_to_next_car_in_lane_front = {999, 999, 999};
+                    vector<double> dist_to_next_car_in_lane_rear = {999, 999, 999};
+
+                    //calculate distance to next vehicle
+                    double expected_distance = car_speed / 2;
 
                     //START avoid hitting other cars
-
-                    //calculate range of lanes
-                    double range_of_left_lane = (2 + 4 * my_lane - 2); //0=0m, 1=4m, 2=8m
-                    double range_of_right_lane = (2 + 4 * my_lane + 2);  //0=4m, 1=8m, 2=12m
 
                     if (prev_size > 0) {
                         car_s = end_path_s;
@@ -159,8 +158,8 @@ int main() {
                         double distance_to_me = check_next_car_s - car_s;
 
                         //debug
-                        cout << "Car " << i << " on lane " << lane_of_next_car << " is in this distance: "
-                             << distance_to_me << endl;
+//                        cout << "Car " << i << " on lane " << lane_of_next_car << " is in this distance: "
+//                             << distance_to_me << endl;
 
                         //START store vehicle information for possible lane shifting
                         // if current vehicle is closer than previous vehicle on its lane
@@ -168,7 +167,7 @@ int main() {
                             //store distance and speed to next vehicle in front
 
                             //get lane speed of next car in front an convert to mph
-                            if (distance_to_me > DISTANCE_TO_OVERTAKE){
+                            if (distance_to_me > DISTANCE_TO_OVERTAKE) {
                                 lane_speeds[lane_of_next_car] = MAX_VELOCITY;
                             } else {
                                 lane_speeds[lane_of_next_car] = check_next_car_speed * 2.24;
@@ -186,8 +185,8 @@ int main() {
 
                         //if car is in my lane && distance gets too small
                         if (lane_of_next_car == my_lane && check_next_car_s > car_s &&
-                            (check_next_car_s - car_s) < MIN_DISTANCE) {
-                            if ((check_next_car_s - car_s) < MIN_DISTANCE / 2) {
+                            distance_to_me < expected_distance) {
+                            if (distance_to_me < expected_distance / 2) {
                                 //brake very hard
                                 way_too_close = true;
                             }
@@ -209,32 +208,30 @@ int main() {
                     } else if (my_lane == 2) {
                         change_left_exists = true;
                     }
-                    //calculate distance to next vehicle
-                    double expected_distance = car_speed / 2;
 
                     //check if lanes have enough room for me
                     change_left_exists = change_left_exists &&
                                          (dist_to_next_car_in_lane_front[my_lane - 1]) > expected_distance &&
-                                         (dist_to_next_car_in_lane_rear[my_lane - 1]) < -expected_distance;
+                                         (dist_to_next_car_in_lane_rear[my_lane - 1]) < -expected_distance * 0.6;
 
                     change_right_exists = change_right_exists &&
                                           (dist_to_next_car_in_lane_front[my_lane + 1]) > expected_distance &&
-                                          (dist_to_next_car_in_lane_rear[my_lane + 1]) < -expected_distance;
+                                          (dist_to_next_car_in_lane_rear[my_lane + 1]) < -expected_distance * 0.6;
                     //END state machine for lane shift options
 
                     //debug
-                    for (int i = 0; i < 3; i++) {
-                        cout << car_speed << " is my speed" << endl;
-                        cout << lane_speeds[i] << " mph on lane " << i << endl;
-                        cout << dist_to_next_car_in_lane_front[i] << " m distance to vehicle front on lane " << i
-                             << endl;
-                        cout << dist_to_next_car_in_lane_rear[i] << " m distance to vehicle back on lane " << i << endl;
-                    }
-                    cout << "my state: " << current_state << endl;
-                    cout << dist_to_next_car_in_lane_front[my_lane] << " m distance to vehicle in front" << endl;
-                    cout << dist_to_next_car_in_lane_rear[my_lane] << " m distance to vehicle in back" << endl;
-                    cout << "LCL exists: " << change_left_exists << endl;
-                    cout << "LCR exists: " << change_right_exists << endl;
+//                    for (int i = 0; i < 3; i++) {
+//                        cout << car_speed << " is my speed" << endl;
+//                        cout << lane_speeds[i] << " mph on lane " << i << endl;
+//                        cout << dist_to_next_car_in_lane_front[i] << " m distance to vehicle front on lane " << i
+//                             << endl;
+//                        cout << dist_to_next_car_in_lane_rear[i] << " m distance to vehicle back on lane " << i << endl;
+//                    }
+//                    cout << "my state: " << current_state << endl;
+//                    cout << dist_to_next_car_in_lane_front[my_lane] << " m distance to vehicle in front" << endl;
+//                    cout << dist_to_next_car_in_lane_rear[my_lane] << " m distance to vehicle in back" << endl;
+//                    cout << "LCL exists: " << change_left_exists << endl;
+//                    cout << "LCR exists: " << change_right_exists << endl;
 
                     if (too_close) {
 
@@ -261,11 +258,11 @@ int main() {
 
                         }
                         /*call cost function, to identify best lane change move and switch to state PLCL or PLCR
-                         *TODO
-                         * 0. consider all lanes even if double change is required
+                         *
+                         * TODO 0. consider all lanes even if double change is required
                          * 1. higher speed, closer to maximum is better
-                         * 2. empty lane is better or at least 100 meters
-                         * 3. left change is better
+                         * 2. empty lane is better or at least DISTANCE_TO_OVERTAKE (100) meters
+                         * 3. left change is better (by always using first in if-conditions)
                          *
                          * */
 
@@ -315,7 +312,7 @@ int main() {
                             current_state = VEHICLE_STATES[3];
 
                             //speed up too slow
-                            if (car_speed < MAX_VELOCITY*0.9){
+                            if (car_speed < MAX_VELOCITY * 0.9) {
                                 ref_vel += ACCELERATION;
                             }
                         } else if (current_state == VEHICLE_STATES[2] && change_right_exists) {
@@ -324,7 +321,7 @@ int main() {
                             current_state = VEHICLE_STATES[4];
 
                             //speed up too slow
-                            if (car_speed < MAX_VELOCITY*0.9){
+                            if (car_speed < MAX_VELOCITY * 0.9) {
                                 ref_vel += ACCELERATION;
                             }
                         }
