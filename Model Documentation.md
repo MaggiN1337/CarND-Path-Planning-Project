@@ -26,26 +26,124 @@ No. | Criteria | How I solved it
 ##### 2. Stay below speed limit
 
 * The maximum velocity + acceleration-step should never exceed the speed limit. Therefore I set them to 49.5 and 0.5.
+* Also if the current speed is 49.4 and the vehicle will accelerate for a short time to 49.9, 
+it will slow down in the next step
 * This makes sure that even in a curve the speed limit will not be exceeded
-* Also if the current speed is 49.4 and the vehicle will accelerate for a short time to 49.9, it is safe
+   
+lines   234 - 244:                 
+                   
+                    if (too_close) {
+
+                        //slow down if car in front is still faster
+                        if (ref_vel > lane_speeds[my_lane] * 0.9) {
+                            ref_vel -= ACCELERATION;
+                        }
+
+                        //brake hard to avoid collision
+                        if (way_too_close) {
+                            ref_vel -= ACCELERATION * 5;
+                        }
+                        
+lines 328 - 330:
+
+                    } else if (ref_vel < MAX_VELOCITY) {
+                        ref_vel += ACCELERATION;
+                    }
 
 ##### 3. Accel and Jerk below limits
 
 * How to stay below the speed limit, see point 2 above
 * To keep the Jerk low, we can use the Spline class
-  * Spline uses the previous position to calcualte the next few waypoints, considering the jaw_rate 
+  * Spline uses the previous position to calculate the next few waypoints, considering the jaw_rate 
   * Lines 334 to 439
   
-##### 4. No collsions
+##### 4. No collisions
+
+To avoid collisions, the vehicle will check if another car is
+* in its lane in front
+* the distance in the predicted next step is lower than the half of the current speed
+* suddenly another car in the front is way too close to it (because it suddenly changed the lane), 
+the car will brake 5-times harder, see code in point 2 (lines 241-244)
 
 
+
+lines 184 - 193: 
+                           
+                           //if car is in my lane && distance gets too small
+                           if (lane_of_next_car == my_lane && check_next_car_s > car_s &&
+                               distance_to_me < expected_distance) {
+                               if (distance_to_me < expected_distance / 2) {
+                                   //brake very hard
+                                   way_too_close = true;
+                               }
+                               //reduce speed
+                               too_close = true;
+                           }
 
 ##### 5. Stay in lane or do fast lane changes
 
+Using the state machine helps a lot for the lane changes.
 
+    const vector<string> VEHICLE_STATES = {"KL", "PLCL", "PLCR", "LCL", "LCR"};
+
+The lines 246 to 326 concetrate on lane changing but only the following part helps to avoid toggling between the lanes:
+
+                        //1. do not change lanes if already in state LCL or LCR
+                        // change state to Keep Lane, if change is nearly completed
+                        if (current_state == VEHICLE_STATES[3] || current_state == VEHICLE_STATES[4]) {
+
+                            //set state to KL if vehicle is back to middle of lane
+                            if (abs(my_lane + 2 - car_d) < 0.2) {
+                                current_state = VEHICLE_STATES[0];
+                            }
+
+                        }
+                        
+Therfore you need to specify a range for d, that tells the vehicle that the lane change is completed.       
 
 ##### 6. Car is able to change lanes
 
+To figure out if another lane exists and has enough space, the state machine in lines 196-218 are necessary, 
+for the vehicle to change safely. I  choose the distance to the vehicle from behind to be smaller than the distance to 
+the front, because we only change with a higher speed and if the new lane is free for the next 60 meters to accelerate
+and overtake.
+
+e.g. this code is relevant
+
+                    //check if lane change is possible by law
+                    if (my_lane == 0) {
+                        change_right_exists = true;
+                    } else if (my_lane == 1) {
+                        change_left_exists = true;
+                        change_right_exists = true;
+                    } else if (my_lane == 2) {
+                        change_left_exists = true;
+                    }
+
+                    //check if lanes have enough room for me
+                    change_left_exists = change_left_exists &&
+                                         (dist_to_next_car_in_lane_front[my_lane - 1]) > expected_distance &&
+                                         (dist_to_next_car_in_lane_rear[my_lane - 1]) < -expected_distance * 0.6;
+                                         
+Later in the code, the lines 258 to 326 implement to call of the cost function based on the lane change possibilities.
+
+                        // 2. calculate costs of lane change options if in state Keep lane
+                        if (current_state == VEHICLE_STATES[0] && change_left_exists && change_right_exists) {
+                            float cost_CL = inefficiency_cost(MAX_VELOCITY, my_lane - 1, my_lane - 1, lane_speeds);
+                            float cost_CR = inefficiency_cost(MAX_VELOCITY, my_lane + 1, my_lane + 1, lane_speeds);
+                            float cost_KL = inefficiency_cost(MAX_VELOCITY, my_lane, my_lane, lane_speeds);
+
+                            if (cost_CL < cost_KL && cost_CL < cost_CR) {
+                                current_state = VEHICLE_STATES[1];
+                            } else if (cost_CR < cost_KL && cost_CR < cost_CL) {
+                                current_state = VEHICLE_STATES[2];
+                            }
+
+                        }
+                        
+The cost function I used in cost.cpp, I took from the classroom:
+
+    float cost = (2*target_speed - lane_speeds[intended_lane] - lane_speeds[final_lane]) / target_speed;
 
 ### Possible improvement for next time
 1. Use a vehicle class for all vehicles
